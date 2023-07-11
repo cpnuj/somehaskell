@@ -39,7 +39,42 @@ executable hweb
   main-is:             HWeb.hs
   default-language:    Haskell2010
   build-depends:       base >= 4.7 && < 5
+                     , text
                      , scotty
+                     , containers
+                     , transformers
+  ghc-options:         -Wall
+                       -Wcompat
+                       -Widentities
+                       -Wincomplete-record-updates
+                       -Wincomplete-uni-patterns
+                       -Wmissing-export-lists
+                       -Wmissing-home-modules
+                       -Wpartial-fields
+                       -Wredundant-constraints
+
+executable vm
+  hs-source-dirs:      .
+  main-is:             VM.hs
+  default-language:    Haskell2010
+  build-depends:       base >= 4.7 && < 5
+                     , transformers
+  ghc-options:         -Wall
+                       -Wcompat
+                       -Widentities
+                       -Wincomplete-record-updates
+                       -Wincomplete-uni-patterns
+                       -Wmissing-export-lists
+                       -Wmissing-home-modules
+                       -Wpartial-fields
+                       -Wredundant-constraints
+
+executable morra
+  hs-source-dirs:      .
+  main-is:             Morra.hs
+  default-language:    Haskell2010
+  build-depends:       base >= 4.7 && < 5
+                     , random
                      , transformers
   ghc-options:         -Wall
                        -Wcompat

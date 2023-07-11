@@ -16,6 +16,14 @@ import Control.Applicative (Applicative(liftA2))
 import System.Random
 import Data.Tuple
 import Control.Monad.Trans.Maybe
+import Control.Monad.State
+import Control.Arrow (ArrowApply(app))
+
+-- runApp :: App -> Int -> IO (a, AppState)
+-- runApp app maxDepth =
+--     let config = AppConfig maxDepth
+--         state = AppState 0
+--     in undefined
 
 listDir :: FilePath -> IO [String]
 listDir = fmap (filter notDots) . getDirectoryContents
@@ -38,6 +46,42 @@ countEntries path = do
         let newName = path </> name
         isDir <- liftIO $ doesDirectoryExist newName
         when isDir $ countEntries newName
+
+newtype AppConfig = AppConfig { cfgMaxDepth :: Int } deriving (Show)
+
+newtype AppState = AppState { stDeepestReached :: Int } deriving (Show)
+
+-- type App a = StateT AppState (ReaderT AppConfig IO) a
+type App a = WriterT String (StateT AppState (ReaderT AppConfig IO)) a
+
+-- runApp :: App a -> Int -> IO (a, AppState)
+runApp :: App a -> Int -> IO ()
+runApp app maxDepth =
+    let config = AppConfig maxDepth
+        s = AppState 0
+    in do
+        ((_, l), s') <- runReaderT (runStateT (runWriterT app) s) config
+        print s'
+        putStr l
+
+constrainedCount :: Int -> FilePath -> App ()
+constrainedCount curDepth path = do
+    contents <- liftIO $ listDirectory path
+    tell $ path ++ " " ++ show (length contents) ++ "\n"
+    cfg <- ask
+    _ <- forM contents $ \name -> do
+        let newPath = path </> name
+        isDir <- liftIO $ doesDirectoryExist newPath
+        if isDir && curDepth < cfgMaxDepth cfg
+          then do
+            let newDepth = curDepth + 1
+            st <- get
+            when (stDeepestReached st < newDepth) $
+              put st {stDeepestReached = newDepth}
+            constrainedCount newDepth newPath
+          else return ()
+    -- return $ (path, length contents) : concat rest
+    return ()
 
 newtype MyReader r a = MyReader { runMyReader :: r -> a }
 
@@ -229,11 +273,54 @@ instance Monad (PState s) where
     (>>=) :: PState s a -> (a -> PState s b) -> PState s b
     sa >>= f = f =<< sa
 
+newtype PStateT s m a = PStateT { runPStateT :: s -> m (a, s) }
+
+instance Functor m => Functor (PStateT s m) where
+    fmap :: (a -> b) -> PStateT s m a -> PStateT s m b
+    fmap f sa = PStateT $ fmap (swap . fmap f . swap) . runPStateT sa
+
+instance Monad m => Applicative (PStateT s m) where
+    pure :: a -> PStateT s m a
+    pure a = PStateT $ pure . (,) a
+
+    (<*>) :: PStateT s m (a -> b) -> PStateT s m a -> PStateT s m b
+    sf <*> sa = PStateT $ \s -> do
+        (ab, s') <- runPStateT sf s
+        (a, s'') <- runPStateT sa s'
+        return (ab a, s'')
+
+instance Monad m => Monad (PStateT s m) where
+    return :: a -> PStateT s m a
+    return = pure
+
+    (>>=) :: PStateT s m a -> (a -> PStateT s m b) -> PStateT s m b
+    sma >>= f = PStateT $ \s -> do
+        (a, s') <- runPStateT sma s
+        runPStateT (f a) s'
+
+instance MonadTrans (PStateT s) where
+    lift :: Monad m => m a -> PStateT s m a
+    lift ma = PStateT $ \s -> do
+        a <- ma
+        return (a, s)
+
 repM :: Applicative f => Int -> f a -> f [a]
 repM n a = if n <= 0 then pure [] else (:) <$> a <*> repM (n-1) a
 
 m :: PState StdGen Int
 m = PState $ randomR (1, 6)
+
+pt :: PStateT StdGen Maybe Int
+pt = PStateT $ \s ->
+    let (a, s') = randomR (1, 6) s in
+    if a > 3 then Just (a, s') else Nothing
+
+rollpt :: PStateT StdGen Maybe Int -> PStateT StdGen Maybe (Int, Int, Int)
+rollpt st = do
+    x <- st
+    y <- st
+    z <- st
+    return (x, y, z)
 
 newtype EitherT e m a = EitherT { runEitherT :: m (Either e a) }
 
@@ -259,8 +346,41 @@ instance Monad m => Monad (EitherT e m) where
             (Left l)  -> return $ Left l
             (Right r) -> runEitherT $ f r
 
-foo :: MaybeT [] Int
-foo = undefined
+instance MonadTrans (EitherT e) where
+    lift :: Monad m => m a -> EitherT e m a
+    lift ma = EitherT $ Right <$> ma
+
+-- ch26
+
+rDec :: Num a => Reader a a
+rDec = do
+    n <- ask
+    return (n - 1)
+
+rPrintAndInc :: (Num a, Show a) => ReaderT a IO a
+rPrintAndInc = do
+    n <- ask
+    liftIO $ putStrLn $ "Hi: " ++ show n
+    return $ n + 1
+
+hasBang :: String -> Bool
+hasBang v = '!' `elem` v
+
+maybeExcite :: MaybeT IO String
+maybeExcite = do
+    v <- liftIO getLine
+    guard $ hasBang v
+    return v
+
+doExcite :: IO ()
+doExcite = do
+    putStrLn "say something excite!"
+    excite <- runMaybeT maybeExcite
+    case excite of
+        Nothing -> putStrLn "MOAR EXCITE"
+        Just e -> putStrLn ("Good, was very excite: " ++ e)
 
 main :: IO ()
-main = putStrLn "somehaskell"
+main = do
+    doExcite
+    -- putStrLn "somehaskell"
