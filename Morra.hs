@@ -2,13 +2,11 @@ module Main (main) where
 
 import System.IO
 import System.Random
+import Control.Monad
 import Control.Monad.IO.Class
-import Control.Monad.Trans.State (StateT, get)
+import Control.Monad.Trans.State
 
-data Action = Action
-    { showing :: Integer
-    , guess   :: Integer
-    }
+data Action = Action Integer Integer
 
 instance Show Action where
     show (Action s g) = "show " ++ show s ++ ", guess " ++ show g
@@ -53,10 +51,10 @@ oneGame p1 p2 = do
     then oneGame p1 p2
     else return winner
 
-data Player = Player
-    { doAction :: IO Action
-    , score    :: Integer
-    }
+newtype Player = Player { score :: Integer }
+
+instance Show Player where
+    show = show . score
 
 addScore :: Integer -> Player -> Player
 addScore n p = p { score = score p + n }
@@ -68,14 +66,14 @@ data Game = Game
 
 recordWinner1 :: Game -> Game
 recordWinner1 game = Game
-    { player1 = addScore 10 (player1 game)
+    { player1 = addScore 1 (player1 game)
     , player2 = player2 game
     }
 
 recordWinner2 :: Game -> Game
 recordWinner2 game = Game
     { player1 = player1 game
-    , player2 = addScore 10 (player2 game)
+    , player2 = addScore 1 (player2 game)
     }
 
 recordWinner :: Winner -> Game -> Game
@@ -84,16 +82,27 @@ recordWinner winner game = case winner of
     P2 -> recordWinner2 game
     _ -> error "recordWinner error"
 
-playGame :: StateT Game IO ()
-playGame = do
+mkGame :: Game
+mkGame = Game
+    { player1 = Player 0
+    , player2 = Player 0
+    }
+
+playGame :: IO Action -> IO Action -> StateT Game IO ()
+playGame a1 a2 = do
+    winner <- liftIO $ oneGame a1 a2
+    liftIO $ putStrLn $ "winner: " ++ show winner
+
     st <- get
-    winner <- liftIO $ oneGame (doAction . player1 $ st) (doAction . player2 $ st)
+    let st' = recordWinner winner st
+    liftIO $ putStrLn $ "player 1: " ++ show (player1 st') ++ ", "
+                     ++ "player 2: " ++ show (player2 st')
+    put st'
 
-    put $ recordWinner winner st
-
-    return ()
+    continue <- liftIO $ prompt "one more? "
+    when (continue == "Y") (playGame a1 a2)
 
 main :: IO ()
 main = do
-    winner <- oneGame aiAction aiAction
-    putStrLn $ show winner ++ " win!"
+    _ <- runStateT (playGame aiAction aiAction) mkGame
+    return ()
