@@ -1,4 +1,10 @@
+resolver: lts-20.24
+
 packages:
 - .
-resolver: lts-20.24
+
+extra-deps:
+- twain-2.1.0.0
+
 system-ghc: true
+

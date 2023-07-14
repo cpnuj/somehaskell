@@ -14,7 +14,7 @@ cabal-version:       >=1.10
 extra-source-files:  README.md
                      CHANGELOG.md
 
-executable bilibili
+executable somehaskell
   hs-source-dirs:      .
   main-is:             Main.hs
   default-language:    Haskell2010
@@ -23,25 +23,6 @@ executable bilibili
                      , filepath
                      , mtl
                      , random
-                     , transformers
-  ghc-options:         -Wall
-                       -Wcompat
-                       -Widentities
-                       -Wincomplete-record-updates
-                       -Wincomplete-uni-patterns
-                       -Wmissing-export-lists
-                       -Wmissing-home-modules
-                       -Wpartial-fields
-                       -Wredundant-constraints
-
-executable hweb
-  hs-source-dirs:      .
-  main-is:             HWeb.hs
-  default-language:    Haskell2010
-  build-depends:       base >= 4.7 && < 5
-                     , text
-                     , scotty
-                     , containers
                      , transformers
   ghc-options:         -Wall
                        -Wcompat
@@ -85,3 +66,26 @@ executable morra
                        -Wmissing-home-modules
                        -Wpartial-fields
                        -Wredundant-constraints
+
+executable bboard
+  hs-source-dirs:      .
+  main-is:             Bboard.hs
+  default-language:    Haskell2010
+  build-depends:       base >= 4.7 && < 5
+                     , containers
+                     , text
+                     , time
+                     , twain
+                     , warp
+                     , stm
+                     , lucid
+  ghc-options:         -Wall
+                       -Wcompat
+                       -Widentities
+                       -Wincomplete-record-updates
+                       -Wincomplete-uni-patterns
+                       -Wmissing-export-lists
+                       -Wmissing-home-modules
+                       -Wpartial-fields
+                       -Wredundant-constraints
+
